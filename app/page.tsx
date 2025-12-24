@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 
 // --- HEADER COMPONENT ---
-// Note: Background and width constraints are now handled by the parent container in Home()
 function Header() {
   const [copied, setCopied] = useState(false);
 
@@ -38,9 +37,9 @@ function Header() {
           <h1 className="text-2xl font-extrabold tracking-tight text-white leading-none">
             RACK2CLOUD
           </h1>
-          {/* Subtitle */}
+          {/* UPDATED Subtitle */}
           <span className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase mt-1">
-            Immutable Cost Estimator
+            Rubrik Virtual Stack TCO Calculator
           </span>
         </div>
       </div>
