@@ -25,16 +25,18 @@ function Header() {
     <header className="bg-[#111827] py-4 px-8 flex flex-col md:flex-row justify-between items-center text-white font-sans print:hidden">
       {/* Logo and Title Section */}
       <div className="flex items-center mb-4 md:mb-0">
-        <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-md mr-3">
-          {/* Cloud/Server Icon */}
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-        </div>
+        
+        {/* UPDATED LOGO IMAGE */}
+        <img 
+          src="https://www.rack2cloud.com/wp-content/uploads/2025/12/Icon.png" 
+          alt="Rack2Cloud Logo" 
+          className="h-10 w-10 mr-3 object-contain"
+        />
+
         <div className="flex flex-col">
-          <h1 className="text-2xl font-bold tracking-wide">RACK2CLOUD</h1>
-          <span className="text-xs text-gray-400 uppercase font-medium tracking-wider">
-            IMMUTABLE COST ESTIMATOR
+          <h1 className="text-2xl font-bold tracking-wide leading-tight">RACK2CLOUD</h1>
+          <span className="text-[10px] text-gray-400 uppercase font-medium tracking-widest">
+            Immutable Cost Estimator
           </span>
         </div>
       </div>
@@ -151,7 +153,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* 1. Header is now here */}
+      {/* 1. Header with custom logo */}
       <Header />
 
       <main className="p-6 flex flex-col items-center">
