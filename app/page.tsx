@@ -6,91 +6,95 @@ export default function Home() {
   // --- STATE MANAGEMENT ---
   const [platform, setPlatform] = useState<"VMware" | "Nutanix" | "HyperV">("VMware");
   
-  // Shared Inputs
+  // Infrastructure Inputs
   const [numHosts, setNumHosts] = useState(3);
   const [cpusPerHost, setCpusPerHost] = useState(2);
   const [coresPerCpu, setCoresPerCpu] = useState(16);
 
-  // Platform Specific Inputs
+  // Rubrik / Storage Inputs
+  const [includeRubrik, setIncludeRubrik] = useState(false);
+  const [storagePerHost, setStoragePerHost] = useState(10); // TB per host
+
+  // Platform Specific Options
   const [vmwareEdition, setVmwareEdition] = useState<"VVF" | "VCF">("VVF");
   const [nutanixTier, setNutanixTier] = useState<"Pro" | "Ultimate">("Pro");
 
   // --- PRICING CONSTANTS (MSRP PLACEHOLDERS) ---
   const PRICES = {
-    VMware: { VVF: 135, VCF: 350 },      // Per Core/Year
-    Nutanix: { Pro: 180, Ultimate: 290 }, // Per Core/Year (NCI)
-    HyperV: { Datacenter: 6155 }          // Per 16-Core Pack (Perpetual approx, divided by 3yr for comparison)
+    VMware: { VVF: 135, VCF: 350 },       // Per Core/Year
+    Nutanix: { Pro: 180, Ultimate: 290 }, // Per Core/Year
+    HyperV: { Datacenter: 6155 },         // Per 16-Core Pack (Perpetual)
+    Rubrik: { Enterprise: 350 }           // Per FET/Year (Estimated Avg)
   };
 
   // --- CALCULATION LOGIC ---
   const [results, setResults] = useState({
-    licensableUnits: 0,
-    unitType: "Cores",
+    infraCost: 0,
+    rubrikCost: 0,
     totalCost: 0,
+    infraUnitLabel: "Cores",
+    totalFET: 0
   });
 
   useEffect(() => {
-    let units = 0;
-    let cost = 0;
+    let infraPrice = 0;
     let unitLabel = "Cores";
+    let rubrikPrice = 0;
 
-    // 1. Calculate Physical Cores (Base Inventory)
+    // 1. Calculate Infrastructure Cost
     const totalPhysicalCores = numHosts * cpusPerHost * coresPerCpu;
 
     if (platform === "VMware") {
-      // Logic: Min 16 cores per CPU
-      const effectiveCoresPerCpu = Math.max(16, coresPerCpu);
-      units = numHosts * cpusPerHost * effectiveCoresPerCpu;
-      
+      const effectiveCoresPerCpu = Math.max(16, coresPerCpu); // Min 16 rule
+      const licensableCores = numHosts * cpusPerHost * effectiveCoresPerCpu;
       const price = vmwareEdition === "VVF" ? PRICES.VMware.VVF : PRICES.VMware.VCF;
-      cost = units * price;
+      infraPrice = licensableCores * price;
       unitLabel = "VVF/VCF Cores";
 
     } else if (platform === "Nutanix") {
-      // Logic: NCI is generally per core now (Cloud Infrastructure)
-      // Usually matches physical cores, sometimes sold in packs. Keeping 1:1 for simplicity.
-      units = totalPhysicalCores;
-      
       const price = nutanixTier === "Pro" ? PRICES.Nutanix.Pro : PRICES.Nutanix.Ultimate;
-      cost = units * price;
+      infraPrice = totalPhysicalCores * price;
       unitLabel = "NCI Cores";
 
     } else if (platform === "HyperV") {
-      // Logic: Windows Server Datacenter (Unlimited VMs).
-      // Sold in packs of 16 cores. Min 8 cores/proc and 16 cores/server.
-      const minCoresPerHost = Math.max(16, cpusPerHost * 8); // Rule: Min 16 per server
+      // Windows Server Datacenter Logic
+      const minCoresPerHost = Math.max(16, cpusPerHost * 8); 
       const totalLicensedCores = Math.max(minCoresPerHost, cpusPerHost * coresPerCpu) * numHosts;
-      
-      // Calculate 2-core packs (Standard SKU unit) or just raw math. 
-      // Simplified: Cost is roughly $6,155 per 16-core license (MSRP perpetual). 
-      // Annualizing it (divide by 3) for fair comparison.
       const packsNeeded = Math.ceil(totalLicensedCores / 16);
-      units = packsNeeded * 16; 
-      cost = packsNeeded * (PRICES.HyperV.Datacenter / 3); 
-      unitLabel = "WinSvr Cores (Annualized)";
+      // Annualized cost (Perpetual / 3)
+      infraPrice = packsNeeded * (PRICES.HyperV.Datacenter / 3); 
+      unitLabel = "WinSvr Cores";
+    }
+
+    // 2. Calculate Rubrik Cost
+    const totalFET = numHosts * storagePerHost;
+    if (includeRubrik) {
+      rubrikPrice = totalFET * PRICES.Rubrik.Enterprise;
     }
 
     setResults({
-      licensableUnits: units,
-      unitType: unitLabel,
-      totalCost: cost,
+      infraCost: infraPrice,
+      rubrikCost: rubrikPrice,
+      totalCost: infraPrice + rubrikPrice,
+      infraUnitLabel: unitLabel,
+      totalFET: totalFET
     });
 
-  }, [platform, numHosts, cpusPerHost, coresPerCpu, vmwareEdition, nutanixTier]);
+  }, [platform, numHosts, cpusPerHost, coresPerCpu, vmwareEdition, nutanixTier, includeRubrik, storagePerHost]);
 
   return (
     <main className="min-h-screen bg-slate-50 p-6 flex flex-col items-center font-sans text-slate-900">
       
-      {/* Top Navigation / Brand */}
+      {/* Top Navigation */}
       <div className="w-full max-w-3xl flex justify-between items-center mb-8">
-        <div className="flex items-center space-x-2">
-          {/* Simple Icon Placeholder */}
-          <div className="w-8 h-8 bg-indigo-600 rounded-md"></div>
-          <span className="text-xl font-bold text-slate-800">Rubrik <span className="font-normal text-slate-500">Sizing & TCO</span></span>
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white font-bold">R</div>
+          <span className="text-xl font-bold text-slate-800">Rubrik <span className="font-normal text-slate-500">Calculator</span></span>
         </div>
+        <div className="text-xs text-slate-400 font-mono">v1.2</div>
       </div>
 
-      <div className="max-w-3xl w-full bg-white shadow-lg rounded-xl overflow-hidden border border-slate-200">
+      <div className="max-w-3xl w-full bg-white shadow-xl rounded-xl overflow-hidden border border-slate-200">
         
         {/* Platform Tabs */}
         <div className="flex bg-slate-100 border-b border-slate-200">
@@ -100,8 +104,8 @@ export default function Home() {
               onClick={() => setPlatform(p as any)}
               className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
                 platform === p 
-                  ? "bg-white text-indigo-600 border-b-2 border-indigo-600" 
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                  ? "bg-white text-indigo-600 border-b-2 border-indigo-600 shadow-sm" 
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200"
               }`}
             >
               {p === "HyperV" ? "Hyper-V" : p}
@@ -109,95 +113,117 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="p-8">
+        <div className="p-8 space-y-8">
           
-          {/* Sub-Header */}
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-800">{platform} Estimator</h2>
-            <p className="text-slate-500 text-sm">
-              {platform === "VMware" && "Broadcom VVF / VCF Subscription Pricing"}
-              {platform === "Nutanix" && "Nutanix Cloud Infrastructure (NCI) Pricing"}
-              {platform === "HyperV" && "Windows Server Datacenter Licensing (Annualized)"}
-            </p>
+          {/* Section 1: Infrastructure */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center">
+                <span className="w-6 h-6 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center text-xs mr-2">1</span>
+                Infrastructure
+              </h3>
+              
+              {/* Dynamic Toggles based on Platform */}
+              <div className="flex bg-slate-100 rounded-lg p-1">
+                {platform === "VMware" && (
+                  <>
+                    <button onClick={() => setVmwareEdition("VVF")} className={`px-3 py-1 text-xs font-semibold rounded ${vmwareEdition === "VVF" ? "bg-white shadow text-indigo-600" : "text-slate-500"}`}>VVF</button>
+                    <button onClick={() => setVmwareEdition("VCF")} className={`px-3 py-1 text-xs font-semibold rounded ${vmwareEdition === "VCF" ? "bg-white shadow text-indigo-600" : "text-slate-500"}`}>VCF</button>
+                  </>
+                )}
+                {platform === "Nutanix" && (
+                  <>
+                    <button onClick={() => setNutanixTier("Pro")} className={`px-3 py-1 text-xs font-semibold rounded ${nutanixTier === "Pro" ? "bg-white shadow text-indigo-600" : "text-slate-500"}`}>Pro</button>
+                    <button onClick={() => setNutanixTier("Ultimate")} className={`px-3 py-1 text-xs font-semibold rounded ${nutanixTier === "Ultimate" ? "bg-white shadow text-indigo-600" : "text-slate-500"}`}>Ultimate</button>
+                  </>
+                )}
+                {platform === "HyperV" && <span className="px-3 py-1 text-xs font-semibold text-slate-500">Datacenter</span>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Hosts</label>
+                <input type="number" min="1" value={numHosts} onChange={(e) => setNumHosts(Number(e.target.value))} className="w-full bg-transparent font-mono text-lg outline-none" />
+              </div>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPUs / Host</label>
+                <input type="number" min="1" value={cpusPerHost} onChange={(e) => setCpusPerHost(Number(e.target.value))} className="w-full bg-transparent font-mono text-lg outline-none" />
+              </div>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cores / CPU</label>
+                <input type="number" min="1" value={coresPerCpu} onChange={(e) => setCoresPerCpu(Number(e.target.value))} className="w-full bg-transparent font-mono text-lg outline-none" />
+              </div>
+            </div>
           </div>
 
-          {/* Dynamic Configuration Toggles */}
-          <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
-            <span className="text-xs font-bold text-slate-400 uppercase mb-2 block">Edition / Tier</span>
-            <div className="flex gap-4">
-              {platform === "VMware" && (
-                <>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="radio" name="vmware" checked={vmwareEdition === "VVF"} onChange={() => setVmwareEdition("VVF")} className="text-indigo-600 focus:ring-indigo-500"/>
-                    <span>vSphere Foundation</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="radio" name="vmware" checked={vmwareEdition === "VCF"} onChange={() => setVmwareEdition("VCF")} className="text-indigo-600 focus:ring-indigo-500"/>
-                    <span>Cloud Foundation</span>
-                  </label>
-                </>
-              )}
-              {platform === "Nutanix" && (
-                <>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="radio" name="nutanix" checked={nutanixTier === "Pro"} onChange={() => setNutanixTier("Pro")} className="text-indigo-600 focus:ring-indigo-500"/>
-                    <span>NCI Pro</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="radio" name="nutanix" checked={nutanixTier === "Ultimate"} onChange={() => setNutanixTier("Ultimate")} className="text-indigo-600 focus:ring-indigo-500"/>
-                    <span>NCI Ultimate</span>
-                  </label>
-                </>
-              )}
-              {platform === "HyperV" && (
-                <span className="text-sm text-slate-500 italic">Standardizing on Windows Server Datacenter Edition</span>
-              )}
-            </div>
-          </div>
+          <hr className="border-slate-100" />
 
-          {/* Hardware Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Hosts</label>
-              <input
-                type="number" min="1" value={numHosts}
-                onChange={(e) => setNumHosts(Number(e.target.value))}
-                className="w-full p-2 bg-white border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-              />
+          {/* Section 2: Rubrik Security */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center">
+                <span className="w-6 h-6 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center text-xs mr-2">2</span>
+                Rubrik Security
+              </h3>
+              
+              {/* Rubrik Toggle */}
+              <button 
+                onClick={() => setIncludeRubrik(!includeRubrik)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${includeRubrik ? 'bg-indigo-600' : 'bg-slate-200'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${includeRubrik ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPUs per Host</label>
-              <input
-                type="number" min="1" value={cpusPerHost}
-                onChange={(e) => setCpusPerHost(Number(e.target.value))}
-                className="w-full p-2 bg-white border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cores per CPU</label>
-              <input
-                type="number" min="1" value={coresPerCpu}
-                onChange={(e) => setCoresPerCpu(Number(e.target.value))}
-                className="w-full p-2 bg-white border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-              />
+
+            <div className={`transition-all duration-300 ${includeRubrik ? 'opacity-100' : 'opacity-50 grayscale'}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Avg Storage per Host (TB)</label>
+                  <input 
+                    type="number" min="1" 
+                    value={storagePerHost} 
+                    onChange={(e) => setStoragePerHost(Number(e.target.value))}
+                    disabled={!includeRubrik}
+                    className="w-full bg-transparent font-mono text-lg outline-none" 
+                  />
+                </div>
+                <div className="flex items-center p-3">
+                  <div className="text-sm text-slate-600">
+                    <span className="font-bold">Est. Front-End TB:</span> {results.totalFET.toLocaleString()} TB
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Bottom Results Bar */}
-          <div className="bg-slate-900 text-white rounded-lg p-6 shadow-inner flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0 text-center md:text-left">
-              <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Total Licensable {results.unitType}</p>
-              <p className="text-3xl font-mono">{results.licensableUnits.toLocaleString()}</p>
+          <div className="bg-slate-900 text-white rounded-lg p-6 shadow-xl">
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between text-sm text-slate-400">
+                <span>{platform} Licensing ({results.infraUnitLabel})</span>
+                <span>${results.infraCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              </div>
+              {includeRubrik && (
+                <div className="flex justify-between text-sm text-indigo-300">
+                  <span>Rubrik Security Cloud (Enterprise)</span>
+                  <span>+ ${results.rubrikCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                </div>
+              )}
             </div>
             
-            <div className="h-10 w-px bg-slate-700 hidden md:block mx-6"></div>
+            <div className="h-px bg-slate-700 mb-4"></div>
 
-            <div className="text-center md:text-right">
-              <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Est. Annual Cost</p>
-              <p className="text-4xl font-bold text-emerald-400">
-                ${results.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">*Hardware not included. Software only.</p>
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Est. Annual Total</p>
+                <p className="text-4xl font-bold text-white">
+                  ${results.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+              </div>
+              <div className="text-right">
+                 <span className="text-xs bg-emerald-500 text-white px-2 py-1 rounded font-bold">ANNUAL OPEX</span>
+              </div>
             </div>
           </div>
 
